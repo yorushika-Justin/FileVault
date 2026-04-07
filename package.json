@@ -1,0 +1,11 @@
+{
+  "name": "filevault",
+  "version": "4.1.0",
+  "description": "FileVault - 多端文件同步系统",
+  "main": "server.js",
+  "author": "FileVault Team",
+  "license": "MIT",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
