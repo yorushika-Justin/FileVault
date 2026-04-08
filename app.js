@@ -544,7 +544,7 @@ function renderGridView(container, filtered, showFolders) {
                         <div class="folder-meta">${fileCount} 个文件${subFolderCount > 0 ? ` · ${subFolderCount} 个子文件夹` : ''}</div>
                         <div class="folder-actions">
                             <button class="file-action-btn share" onclick="event.stopPropagation(); showFolderQR('${folder.id}')">分享</button>
-                            <button class="file-action-btn" onclick="event.stopPropagation(); renameFolder('${folder.id}')">重命名</button>
+                            <button class="file-action-btn" onclick="event.stopPropagation(); downloadFolder('${folder.id}')">下载</button>
                             <button class="file-action-btn delete" onclick="event.stopPropagation(); deleteFolder('${folder.id}')">删除</button>
                         </div>
                     </div>
@@ -637,7 +637,7 @@ function renderListView(container, filtered, showFolders) {
                     <td>
                         <div class="file-actions-cell">
                             <button class="file-action-btn share" onclick="event.stopPropagation(); showFolderQR('${folder.id}')">分享</button>
-                            <button class="file-action-btn" onclick="event.stopPropagation(); renameFolder('${folder.id}')">重命名</button>
+                            <button class="file-action-btn" onclick="event.stopPropagation(); downloadFolder('${folder.id}')">下载</button>
                             <button class="file-action-btn delete" onclick="event.stopPropagation(); deleteFolder('${folder.id}')">删除</button>
                         </div>
                     </td>
@@ -838,6 +838,73 @@ async function downloadFile(fileId) {
         document.body.removeChild(link);
         
         URL.revokeObjectURL(url);
+    } catch (e) {
+        showToast('下载失败：' + e.message, 'error');
+    }
+}
+
+async function downloadFolder(folderId) {
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder) {
+        showToast('文件夹不存在', 'error');
+        return;
+    }
+    
+    try {
+        showToast('开始下载文件夹：' + folder.name, 'success');
+        
+        const infoResponse = await fetch('/api/folders/' + folderId + '/info');
+        if (!infoResponse.ok) {
+            throw new Error('获取文件夹信息失败');
+        }
+        
+        const folderInfo = await infoResponse.json();
+        const contents = folderInfo.contents;
+        const files = contents.filter(c => c.type === 'file');
+        
+        const zip = new JSZip();
+        let processed = 0;
+        const total = files.length;
+        
+        for (const file of files) {
+            try {
+                showToast(`正在下载文件... (${processed + 1}/${total})`, 'info');
+                
+                const fileResponse = await fetch('/api/download/' + file.id);
+                if (!fileResponse.ok) {
+                    console.warn('Failed to download file:', file.name);
+                    continue;
+                }
+                
+                const blob = await fileResponse.blob();
+                zip.file(file.path, blob);
+                
+                processed++;
+            } catch (e) {
+                console.warn('Error processing file:', file.name, e);
+            }
+        }
+        
+        showToast('正在生成 ZIP 文件...', 'info');
+        
+        const zipBlob = await zip.generateAsync({ 
+            type: 'blob',
+            compression: 'DEFLATE',
+            compressionOptions: { level: 6 }
+        });
+        
+        const url = URL.createObjectURL(zipBlob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = folder.name + '.zip';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        URL.revokeObjectURL(url);
+        
+        showToast('文件夹下载完成！', 'success');
     } catch (e) {
         showToast('下载失败：' + e.message, 'error');
     }
