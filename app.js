@@ -543,6 +543,7 @@ function renderGridView(container, filtered, showFolders) {
                         <div class="folder-name" title="${escapeHtml(folder.name)}">${escapeHtml(folder.name)}</div>
                         <div class="folder-meta">${fileCount} 个文件${subFolderCount > 0 ? ` · ${subFolderCount} 个子文件夹` : ''}</div>
                         <div class="folder-actions">
+                            <button class="file-action-btn share" onclick="event.stopPropagation(); showFolderQR('${folder.id}')">分享</button>
                             <button class="file-action-btn" onclick="event.stopPropagation(); renameFolder('${folder.id}')">重命名</button>
                             <button class="file-action-btn delete" onclick="event.stopPropagation(); deleteFolder('${folder.id}')">删除</button>
                         </div>
@@ -635,6 +636,7 @@ function renderListView(container, filtered, showFolders) {
                     <td>${formatDate(folder.createdAt || 0)}</td>
                     <td>
                         <div class="file-actions-cell">
+                            <button class="file-action-btn share" onclick="event.stopPropagation(); showFolderQR('${folder.id}')">分享</button>
                             <button class="file-action-btn" onclick="event.stopPropagation(); renameFolder('${folder.id}')">重命名</button>
                             <button class="file-action-btn delete" onclick="event.stopPropagation(); deleteFolder('${folder.id}')">删除</button>
                         </div>
@@ -762,6 +764,25 @@ function showFileQR(fileId) {
     const shareUrl = 'http://' + localIP + ':' + port + '/share.html?f=' + fileId;
     
     document.getElementById('shareFileName').textContent = file.name;
+    document.getElementById('shareLinkInput').value = shareUrl;
+    
+    generateQRCode(shareUrl, 'qrCodeContainer');
+    
+    document.getElementById('shareModal').classList.add('active');
+}
+
+function showFolderQR(folderId) {
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder) {
+        showToast('文件夹不存在', 'error');
+        return;
+    }
+    
+    const localIP = getLocalIP();
+    const port = detectedPort || window.location.port || '8888';
+    const shareUrl = 'http://' + localIP + ':' + port + '/share.html?folder=' + folderId;
+    
+    document.getElementById('shareFileName').textContent = folder.name + ' (文件夹)';
     document.getElementById('shareLinkInput').value = shareUrl;
     
     generateQRCode(shareUrl, 'qrCodeContainer');

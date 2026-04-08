@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { networkInterfaces } = require('os');
+const { createWriteStream, readFileSync } = require('fs');
 
 console.log('Starting FileVault server...');
 
@@ -109,6 +110,35 @@ function deleteFolderRecursive(folderId) {
     });
     
     delete folders[folderId];
+}
+
+function collectFolderContents(folderId, basePath = '') {
+    const contents = [];
+    const childFolders = Object.values(folders).filter(f => f.parentId === folderId);
+    const folderFiles = Object.values(fileMetadata).filter(f => f.folderId === folderId);
+    
+    folderFiles.forEach(file => {
+        contents.push({
+            type: 'file',
+            id: file.id,
+            name: file.name,
+            path: path.join(basePath, file.name)
+        });
+    });
+    
+    childFolders.forEach(folder => {
+        const folderPath = path.join(basePath, folder.name);
+        contents.push({
+            type: 'folder',
+            id: folder.id,
+            name: folder.name,
+            path: folderPath
+        });
+        const childContents = collectFolderContents(folder.id, folderPath);
+        contents.push(...childContents);
+    });
+    
+    return contents;
 }
 
 function handleApi(req, res) {
@@ -376,6 +406,45 @@ function handleApi(req, res) {
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: '文件夹不存在' }));
         }
+        return;
+    }
+
+    if (url.startsWith('/api/folders/') && url.endsWith('/info') && req.method === 'GET') {
+        const folderId = url.split('/')[3];
+        if (folders[folderId]) {
+            const contents = collectFolderContents(folderId);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ 
+                folder: folders[folderId], 
+                contents: contents 
+            }));
+        } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '文件夹不存在' }));
+        }
+        return;
+    }
+
+    if (url.startsWith('/api/folders/') && url.endsWith('/download') && req.method === 'GET') {
+        const folderId = url.split('/')[3];
+        if (!folders[folderId]) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '文件夹不存在' }));
+            return;
+        }
+        
+        const folderName = folders[folderId].name;
+        const contents = collectFolderContents(folderId);
+        
+        res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Content-Disposition': `attachment; filename="${encodeURIComponent(folderName)}.zip"`
+        });
+        
+        res.end(JSON.stringify({
+            folderName: folderName,
+            contents: contents
+        }));
         return;
     }
 
