@@ -14,6 +14,8 @@ let selectedFiles = new Set();
 let draggedFileId = null;
 const LIST_VIEW_THRESHOLD = 10;
 const imageCache = new Map();
+let contextMenuTarget = null;
+let contextMenuType = null;
 
 async function fetchLocalIP() {
     try {
@@ -535,7 +537,8 @@ function renderGridView(container, filtered, showFolders) {
                      ondragover="event.preventDefault(); this.classList.add('dragover');"
                      ondragleave="this.classList.remove('dragover');"
                      ondrop="handleFolderDrop(event, '${folder.id}')"
-                     onclick="enterFolder('${folder.id}')">
+                     onclick="enterFolder('${folder.id}')"
+                     oncontextmenu="showContextMenu(event, 'folder', '${folder.id}')">
                     <div class="folder-preview">
                         <span class="folder-icon">📁</span>
                     </div>
@@ -558,7 +561,8 @@ function renderGridView(container, filtered, showFolders) {
         html += `
             <div class="file-card ${isSelected ? 'selected' : ''}" data-id="${f.id}" draggable="true"
                  ondragstart="handleFileDragStart(event, '${f.id}')"
-                 ondragend="handleFileDragEnd(event)">
+                 ondragend="handleFileDragEnd(event)"
+                 oncontextmenu="showContextMenu(event, 'file', '${f.id}')">
                 <div class="file-checkbox ${isSelected ? 'checked' : ''}" onclick="event.stopPropagation(); toggleFileSelection('${f.id}')">${isSelected ? '✓' : ''}</div>
                 <div class="file-preview" onclick="${selectMode ? `toggleFileSelection('${f.id}')` : `previewFile('${f.id}', '${f.category}')`}">
                     ${renderPreviewContent(f)}
@@ -624,7 +628,9 @@ function renderListView(container, filtered, showFolders) {
                     ondragover="event.preventDefault(); this.classList.add('dragover');"
                     ondragleave="this.classList.remove('dragover');"
                     ondrop="handleFolderDrop(event, '${folder.id}')"
-                    onclick="enterFolder('${folder.id}')" style="cursor: pointer;">
+                    onclick="enterFolder('${folder.id}')" 
+                    oncontextmenu="showContextMenu(event, 'folder', '${folder.id}')"
+                    style="cursor: pointer;">
                     <td>
                         <div class="file-name-cell">
                             <span class="file-icon">📁</span>
@@ -651,7 +657,8 @@ function renderListView(container, filtered, showFolders) {
         html += `
             <tr class="${isSelected ? 'selected' : ''}" data-id="${f.id}" draggable="true"
                 ondragstart="handleFileDragStart(event, '${f.id}')"
-                ondragend="handleFileDragEnd(event)">
+                ondragend="handleFileDragEnd(event)"
+                oncontextmenu="showContextMenu(event, 'file', '${f.id}')">
                 <td>
                     <div class="file-name-cell">
                         ${selectMode ? `<div class="file-checkbox ${isSelected ? 'checked' : ''}" onclick="event.stopPropagation(); toggleFileSelection('${f.id}')">${isSelected ? '✓' : ''}</div>` : ''}
@@ -1318,5 +1325,125 @@ async function handleFolderDrop(event, folderId) {
     
     draggedFileId = null;
 }
+
+function showContextMenu(event, type, id) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    contextMenuTarget = id;
+    contextMenuType = type;
+    
+    const contextMenu = document.getElementById('contextMenu');
+    contextMenu.style.display = 'block';
+    
+    let x = event.clientX;
+    let y = event.clientY;
+    
+    const menuRect = contextMenu.getBoundingClientRect();
+    if (x + menuRect.width > window.innerWidth) {
+        x = x - menuRect.width;
+    }
+    if (y + menuRect.height > window.innerHeight) {
+        y = y - menuRect.height;
+    }
+    
+    contextMenu.style.left = x + 'px';
+    contextMenu.style.top = y + 'px';
+}
+
+function hideContextMenu() {
+    const contextMenu = document.getElementById('contextMenu');
+    contextMenu.style.display = 'none';
+    contextMenuTarget = null;
+    contextMenuType = null;
+}
+
+async function handleContextAction(action) {
+    hideContextMenu();
+    
+    if (!contextMenuTarget || !contextMenuType) return;
+    
+    try {
+        if (contextMenuType === 'folder') {
+            const folder = folders.find(f => f.id === contextMenuTarget);
+            if (!folder) {
+                showToast('文件夹不存在', 'error');
+                return;
+            }
+            
+            switch (action) {
+                case 'rename':
+                    await renameFolder(contextMenuTarget);
+                    break;
+                case 'download':
+                    await downloadFolder(contextMenuTarget);
+                    break;
+                case 'delete':
+                    await deleteFolder(contextMenuTarget);
+                    break;
+                case 'share':
+                    showFolderQR(contextMenuTarget);
+                    break;
+            }
+        } else if (contextMenuType === 'file') {
+            const file = files.find(f => f.id === contextMenuTarget);
+            if (!file) {
+                showToast('文件不存在', 'error');
+                return;
+            }
+            
+            switch (action) {
+                case 'rename':
+                    const newName = prompt('请输入新的文件名：', file.name);
+                    if (!newName || !newName.trim() || newName === file.name) return;
+                    
+                    try {
+                        const response = await fetch('/api/files/' + contextMenuTarget, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: newName.trim() })
+                        });
+                        
+                        if (response.ok) {
+                            showToast('文件重命名成功', 'success');
+                            previousFilesJSON = '';
+                            await fetchFilesFromServer();
+                        } else {
+                            const data = await response.json();
+                            showToast(data.error || '重命名失败', 'error');
+                        }
+                    } catch (e) {
+                        showToast('重命名失败：' + e.message, 'error');
+                    }
+                    break;
+                case 'download':
+                    await downloadFile(contextMenuTarget);
+                    break;
+                case 'delete':
+                    await deleteFile(contextMenuTarget);
+                    break;
+                case 'share':
+                    showFileQR(contextMenuTarget);
+                    break;
+            }
+        }
+    } catch (e) {
+        console.error('Context menu action error:', e);
+        showToast('操作失败：' + e.message, 'error');
+    }
+}
+
+document.addEventListener('click', function(event) {
+    const contextMenu = document.getElementById('contextMenu');
+    if (contextMenu.style.display === 'block' && !contextMenu.contains(event.target)) {
+        hideContextMenu();
+    }
+});
+
+document.addEventListener('contextmenu', function(event) {
+    if (!event.target.closest('.file-card') && !event.target.closest('.folder-card') && !event.target.closest('.folder-row') && !event.target.closest('tr[data-id]')) {
+        hideContextMenu();
+    }
+});
 
 window.addEventListener('load', init);
