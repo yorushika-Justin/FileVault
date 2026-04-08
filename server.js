@@ -118,16 +118,17 @@ function collectFolderContents(folderId, basePath = '') {
     const folderFiles = Object.values(fileMetadata).filter(f => f.folderId === folderId);
     
     folderFiles.forEach(file => {
+        const filePath = basePath ? basePath + '/' + file.name : file.name;
         contents.push({
             type: 'file',
             id: file.id,
             name: file.name,
-            path: path.join(basePath, file.name)
+            path: filePath
         });
     });
     
     childFolders.forEach(folder => {
-        const folderPath = path.join(basePath, folder.name);
+        const folderPath = basePath ? basePath + '/' + folder.name : folder.name;
         contents.push({
             type: 'folder',
             id: folder.id,
@@ -410,15 +411,21 @@ function handleApi(req, res) {
     }
 
     if (url.startsWith('/api/folders/') && url.endsWith('/info') && req.method === 'GET') {
-        const folderId = url.split('/')[3];
+        const parts = url.split('/');
+        const folderId = parts[3];
+        console.log('Folder info request for:', folderId, 'URL:', url);
+        console.log('Available folders:', Object.keys(folders));
+        
         if (folders[folderId]) {
             const contents = collectFolderContents(folderId);
+            console.log('Folder found, contents:', contents.length);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ 
                 folder: folders[folderId], 
                 contents: contents 
             }));
         } else {
+            console.log('Folder not found:', folderId);
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: '文件夹不存在' }));
         }
