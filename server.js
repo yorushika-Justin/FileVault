@@ -369,47 +369,7 @@ function handleApi(req, res) {
         return;
     }
 
-    if (url.startsWith('/api/folders/') && req.method === 'PUT') {
-        const folderId = url.split('/').pop();
-        let body = '';
-        req.on('data', chunk => { body += chunk; });
-        req.on('end', () => {
-            try {
-                const data = JSON.parse(body);
-                if (!folders[folderId]) {
-                    res.writeHead(404, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: '文件夹不存在' }));
-                    return;
-                }
-                if (data.name) {
-                    folders[folderId].name = escapeHtml(data.name);
-                }
-                saveFolders();
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: true, folder: folders[folderId] }));
-            } catch (e) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: e.message }));
-            }
-        });
-        return;
-    }
-
-    if (url.startsWith('/api/folders/') && req.method === 'DELETE') {
-        const folderId = url.split('/').pop();
-        if (folders[folderId]) {
-            deleteFolderRecursive(folderId);
-            saveFolders();
-            saveMetadata();
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true }));
-        } else {
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: '文件夹不存在' }));
-        }
-        return;
-    }
-
+    // 必须放在 PUT 和 DELETE 之前，避免被错误路由
     if (url.startsWith('/api/folders/') && url.endsWith('/info') && req.method === 'GET') {
         const parts = url.split('/');
         const folderId = parts[3];
@@ -452,6 +412,48 @@ function handleApi(req, res) {
             folderName: folderName,
             contents: contents
         }));
+        return;
+    }
+
+    // 通用的 PUT 和 DELETE 路由放在最后
+    if (url.startsWith('/api/folders/') && req.method === 'PUT') {
+        const folderId = url.split('/').pop();
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try {
+                const data = JSON.parse(body);
+                if (!folders[folderId]) {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '文件夹不存在' }));
+                    return;
+                }
+                if (data.name) {
+                    folders[folderId].name = escapeHtml(data.name);
+                }
+                saveFolders();
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, folder: folders[folderId] }));
+            } catch (e) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: e.message }));
+            }
+        });
+        return;
+    }
+
+    if (url.startsWith('/api/folders/') && req.method === 'DELETE') {
+        const folderId = url.split('/').pop();
+        if (folders[folderId]) {
+            deleteFolderRecursive(folderId);
+            saveFolders();
+            saveMetadata();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true }));
+        } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '文件夹不存在' }));
+        }
         return;
     }
 
