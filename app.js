@@ -436,8 +436,11 @@ function getTypeLabel(category) {
 }
 
 function updateCounts() {
-    const counts = { all: files.length, pdf: 0, word: 0, image: 0, other: 0 };
-    const timeCounts = { all: files.length, today: 0, week: 0, older: 0 };
+    const rootFolders = folders.filter(f => !f.parentId);
+    const totalItems = files.length + rootFolders.length;
+    
+    const counts = { all: totalItems, pdf: 0, word: 0, image: 0, other: 0 };
+    const timeCounts = { all: totalItems, today: 0, week: 0, older: 0 };
     
     files.forEach(f => {
         counts[f.category]++;
@@ -454,7 +457,7 @@ function updateCounts() {
         if (el) el.textContent = timeCounts[key];
     });
     
-    document.getElementById('total-files').textContent = files.length;
+    document.getElementById('total-files').textContent = totalItems;
     const totalSize = files.reduce((sum, f) => sum + (f.size || 0), 0);
     document.getElementById('total-size').textContent = formatFileSize(totalSize);
 }

@@ -7,7 +7,7 @@ console.log('Starting FileVault server...');
 
 const CONFIG = {
     PORT: 8888,
-    MAX_FILE_SIZE: 100 * 1024 * 1024,
+    MAX_FILE_SIZE: 1024 * 1024 * 1024,
     DATA_DIR: path.join(__dirname, 'data')
 };
 
@@ -94,6 +94,23 @@ function escapeHtml(text) {
         .replace(/'/g, '&#039;');
 }
 
+function deleteFolderRecursive(folderId) {
+    const childFolders = Object.values(folders).filter(f => f.parentId === folderId);
+    childFolders.forEach(child => deleteFolderRecursive(child.id));
+    
+    Object.keys(fileMetadata).forEach(fileId => {
+        if (fileMetadata[fileId].folderId === folderId) {
+            delete fileMetadata[fileId];
+            const filePath = path.join(CONFIG.DATA_DIR, fileId);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        }
+    });
+    
+    delete folders[folderId];
+}
+
 function handleApi(req, res) {
     const url = req.url.split('?')[0];
 
@@ -164,7 +181,7 @@ function handleApi(req, res) {
             totalSize += chunk.length;
             if (totalSize > CONFIG.MAX_FILE_SIZE) {
                 res.writeHead(413, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: '文件大小超过限制 (最大100MB)' }));
+                res.end(JSON.stringify({ error: '文件大小超过限制 (最大1GB)' }));
                 req.destroy();
                 return;
             }
@@ -347,23 +364,6 @@ function handleApi(req, res) {
         return;
     }
 
-    function deleteFolderRecursive(folderId) {
-        const childFolders = Object.values(folders).filter(f => f.parentId === folderId);
-        childFolders.forEach(child => deleteFolderRecursive(child.id));
-        
-        Object.keys(fileMetadata).forEach(fileId => {
-            if (fileMetadata[fileId].folderId === folderId) {
-                delete fileMetadata[fileId];
-                const filePath = path.join(CONFIG.DATA_DIR, fileId);
-                if (fs.existsSync(filePath)) {
-                    fs.unlinkSync(filePath);
-                }
-            }
-        });
-        
-        delete folders[folderId];
-    }
-
     if (url.startsWith('/api/folders/') && req.method === 'DELETE') {
         const folderId = url.split('/').pop();
         if (folders[folderId]) {
@@ -474,7 +474,7 @@ server.listen(CONFIG.PORT, '0.0.0.0', () => {
     console.log('FileVault Server Running');
     console.log('Local:   http://localhost:' + CONFIG.PORT);
     console.log('LAN:     http://' + localIP + ':' + CONFIG.PORT);
-    console.log('Max File Size: 100MB');
+    console.log('Max File Size: 1GB');
     console.log('================================');
     console.log('Press Ctrl+C to stop the server');
 });
