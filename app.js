@@ -546,7 +546,6 @@ function renderGridView(container, filtered, showFolders) {
                         <div class="folder-name" title="${escapeHtml(folder.name)}">${escapeHtml(folder.name)}</div>
                         <div class="folder-meta">${fileCount} 个文件${subFolderCount > 0 ? ` · ${subFolderCount} 个子文件夹` : ''}</div>
                         <div class="folder-actions">
-                            <button class="file-action-btn share" onclick="event.stopPropagation(); showFolderQR('${folder.id}')">分享</button>
                             <button class="file-action-btn" onclick="event.stopPropagation(); downloadFolder('${folder.id}')">下载</button>
                             <button class="file-action-btn delete" onclick="event.stopPropagation(); deleteFolder('${folder.id}')">删除</button>
                         </div>
@@ -572,7 +571,6 @@ function renderGridView(container, filtered, showFolders) {
                     <div class="file-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>
                     <div class="file-meta">${formatFileSize(f.size || 0)} · ${formatDate(f.uploadTime || 0)}</div>
                     <div class="file-actions">
-                        <button class="file-action-btn share" onclick="event.stopPropagation(); showFileQR('${f.id}')">分享</button>
                         <button class="file-action-btn" onclick="event.stopPropagation(); downloadFile('${f.id}')">下载</button>
                         <button class="file-action-btn delete" onclick="event.stopPropagation(); deleteFile('${f.id}')">删除</button>
                     </div>
@@ -642,7 +640,6 @@ function renderListView(container, filtered, showFolders) {
                     <td>${formatDate(folder.createdAt || 0)}</td>
                     <td>
                         <div class="file-actions-cell">
-                            <button class="file-action-btn share" onclick="event.stopPropagation(); showFolderQR('${folder.id}')">分享</button>
                             <button class="file-action-btn" onclick="event.stopPropagation(); downloadFolder('${folder.id}')">下载</button>
                             <button class="file-action-btn delete" onclick="event.stopPropagation(); deleteFolder('${folder.id}')">删除</button>
                         </div>
@@ -674,7 +671,6 @@ function renderListView(container, filtered, showFolders) {
                 <td>${formatDate(f.uploadTime || 0)}</td>
                 <td>
                     <div class="file-actions-cell">
-                        <button class="file-action-btn share" onclick="showFileQR('${f.id}')">分享</button>
                         <button class="file-action-btn" onclick="downloadFile('${f.id}')">下载</button>
                         <button class="file-action-btn delete" onclick="deleteFile('${f.id}')">删除</button>
                     </div>
@@ -797,28 +793,55 @@ function showFolderQR(folderId) {
     document.getElementById('shareModal').classList.add('active');
 }
 
-function openFileShareModal() {
-    const fileList = document.getElementById('fileShareList');
+function openSelectShareModal() {
+    const shareList = document.getElementById('shareList');
     
-    if (files.length === 0) {
-        fileList.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">暂无文件</div>';
+    const rootFolders = folders.filter(f => !f.parentId);
+    const rootFiles = files.filter(f => !f.folderId);
+    
+    if (rootFolders.length === 0 && rootFiles.length === 0) {
+        shareList.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">暂无文件或文件夹</div>';
     } else {
-        fileList.innerHTML = files.map(f => `
-            <div class="file-share-item" onclick="showFileQR('${f.id}'); closeFileShareModal();">
-                <span style="font-size: 20px; margin-right: 10px;">${getFileIcon(f.category)}</span>
-                <div>
-                    <div style="font-weight: 600; font-size: 13px;">${escapeHtml(f.name)}</div>
-                    <div style="font-size: 11px; color: #999;">${formatFileSize(f.size || 0)}</div>
+        let html = '';
+        
+        if (rootFolders.length > 0) {
+            html += '<div style="font-size: 12px; font-weight: 700; color: #667eea; margin-bottom: 8px; padding: 0 8px;">文件夹</div>';
+            html += rootFolders.map(f => {
+                const childCount = Object.values(folders).filter(child => child.parentId === f.id).length;
+                const fileCount = files.filter(file => file.folderId === f.id).length;
+                return `
+                    <div class="file-share-item" onclick="showFolderQR('${f.id}'); closeSelectShareModal();">
+                        <span style="font-size: 20px; margin-right: 10px;">📁</span>
+                        <div>
+                            <div style="font-weight: 600; font-size: 13px;">${escapeHtml(f.name)}</div>
+                            <div style="font-size: 11px; color: #999;">${fileCount} 个文件 · ${childCount} 个子文件夹</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        if (rootFiles.length > 0) {
+            html += '<div style="font-size: 12px; font-weight: 700; color: #667eea; margin-bottom: 8px; padding: 0 8px; margin-top: 16px;">文件</div>';
+            html += rootFiles.map(f => `
+                <div class="file-share-item" onclick="showFileQR('${f.id}'); closeSelectShareModal();">
+                    <span style="font-size: 20px; margin-right: 10px;">${getFileIcon(f.category)}</span>
+                    <div>
+                        <div style="font-weight: 600; font-size: 13px;">${escapeHtml(f.name)}</div>
+                        <div style="font-size: 11px; color: #999;">${formatFileSize(f.size || 0)}</div>
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `).join('');
+        }
+        
+        shareList.innerHTML = html;
     }
     
-    document.getElementById('fileShareModal').classList.add('active');
+    document.getElementById('selectShareModal').classList.add('active');
 }
 
-function closeFileShareModal() {
-    document.getElementById('fileShareModal').classList.remove('active');
+function closeSelectShareModal() {
+    document.getElementById('selectShareModal').classList.remove('active');
 }
 
 async function downloadFile(fileId) {

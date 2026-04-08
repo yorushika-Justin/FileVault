@@ -144,6 +144,12 @@ function collectFolderContents(folderId, basePath = '') {
 
 function handleApi(req, res) {
     const url = req.url.split('?')[0];
+    console.log('=== New API Request ===');
+    console.log('Method:', req.method);
+    console.log('URL:', url);
+    console.log('URL starts with /api/folders/:', url.startsWith('/api/folders/'));
+    console.log('URL ends with /info:', url.endsWith('/info'));
+    console.log('URL ends with /download:', url.endsWith('/download'));
 
     if (url === '/api/files' && req.method === 'GET') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -370,7 +376,9 @@ function handleApi(req, res) {
     }
 
     // 必须放在 PUT 和 DELETE 之前，避免被错误路由
+    console.log('Checking /info route match:', url.startsWith('/api/folders/'), '&&', url.endsWith('/info'), '&&', req.method === 'GET');
     if (url.startsWith('/api/folders/') && url.endsWith('/info') && req.method === 'GET') {
+        console.log('>>> /info route matched!');
         const parts = url.split('/');
         const folderId = parts[3];
         console.log('Folder info request for:', folderId, 'URL:', url);
@@ -392,9 +400,13 @@ function handleApi(req, res) {
         return;
     }
 
+    console.log('Checking /download route match:', url.startsWith('/api/folders/'), '&&', url.endsWith('/download'), '&&', req.method === 'GET');
     if (url.startsWith('/api/folders/') && url.endsWith('/download') && req.method === 'GET') {
+        console.log('>>> /download route matched!');
         const folderId = url.split('/')[3];
+        console.log('Folder download request for:', folderId);
         if (!folders[folderId]) {
+            console.log('Folder not found:', folderId);
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: '文件夹不存在' }));
             return;
@@ -416,7 +428,9 @@ function handleApi(req, res) {
     }
 
     // 通用的 PUT 和 DELETE 路由放在最后
+    console.log('Checking generic PUT route match:', url.startsWith('/api/folders/'), '&&', req.method === 'PUT');
     if (url.startsWith('/api/folders/') && req.method === 'PUT') {
+        console.log('>>> Generic PUT route matched!');
         const folderId = url.split('/').pop();
         let body = '';
         req.on('data', chunk => { body += chunk; });
@@ -442,7 +456,9 @@ function handleApi(req, res) {
         return;
     }
 
+    console.log('Checking generic DELETE route match:', url.startsWith('/api/folders/'), '&&', req.method === 'DELETE');
     if (url.startsWith('/api/folders/') && req.method === 'DELETE') {
+        console.log('>>> Generic DELETE route matched!');
         const folderId = url.split('/').pop();
         if (folders[folderId]) {
             deleteFolderRecursive(folderId);

@@ -266,11 +266,6 @@
         <h1>FileVault</h1>
         <div class="header-actions">
             <button class="btn btn-secondary" onclick="exportData()">导出</button>
-            <button class="btn" onclick="openFileShareModal()">分享</button>
-            <div class="file-input-wrapper">
-                <button class="btn">上传</button>
-                <input type="file" class="file-input" id="fileInput" multiple onchange="handleFileSelect(event)" accept="*/*">
-            </div>
         </div>
     </header>
 
@@ -360,6 +355,7 @@
                         <h3>📁 文件列表</h3>
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <button class="btn btn-folder" onclick="createFolder()">新建文件夹</button>
+                            <button class="btn" onclick="openSelectShareModal()">分享</button>
                             <button class="btn btn-secondary" id="selectModeBtn" onclick="toggleSelectMode()">选择</button>
                             <div class="view-toggle">
                                 <button class="view-btn active" id="gridViewBtn" onclick="setViewMode('grid')">卡片</button>
@@ -411,13 +407,13 @@
         </div>
     </div>
 
-    <div class="modal" id="fileShareModal">
+    <div class="modal" id="selectShareModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>选择要分享的文件</h2>
-                <button class="modal-close" onclick="closeFileShareModal()">×</button>
+                <h2>选择要分享的文件或文件夹</h2>
+                <button class="modal-close" onclick="closeSelectShareModal()">×</button>
             </div>
-            <div id="fileShareList" style="max-height: 400px; overflow-y: auto;"></div>
+            <div id="shareList" style="max-height: 400px; overflow-y: auto;"></div>
         </div>
     </div>
 
