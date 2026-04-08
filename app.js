@@ -159,6 +159,156 @@ function generateShortId() {
     return result;
 }
 
+async function handleFolderSelect(event) {
+    const files = Array.from(event.target.files);
+    if (files.length > 0) {
+        await processFolderFiles(files);
+    }
+    event.target.value = '';
+}
+
+async function processFolderFiles(fileList) {
+    const progress = document.getElementById('uploadProgress');
+    const progressFill = document.getElementById('progressFill');
+    
+    progress.style.display = 'block';
+    let processed = 0;
+    const total = fileList.length;
+    
+    const folderMap = new Map();
+    
+    for (const file of fileList) {
+        try {
+            await processFileWithPath(file, folderMap);
+            processed++;
+            const percent = Math.round((processed / total) * 100);
+            progressFill.style.width = percent + '%';
+        } catch (error) {
+            console.error('Failed to process file:', file.webkitRelativePath || file.name, error);
+            showToast(`上传失败：${file.webkitRelativePath || file.name} - ${error.message}`, 'error');
+        }
+    }
+    
+    setTimeout(async () => {
+        progress.style.display = 'none';
+        progressFill.style.width = '0%';
+        previousFilesJSON = '';
+        previousFoldersJSON = '';
+        await fetchFoldersFromServer();
+        await fetchFilesFromServer();
+        if (processed > 0) {
+            showToast(`${processed} 个文件上传成功`, 'success');
+        }
+    }, 500);
+}
+
+async function getOrCreateFolder(path, folderMap) {
+    if (!path || path === '') {
+        return currentFolder;
+    }
+    
+    if (folderMap.has(path)) {
+        return folderMap.get(path);
+    }
+    
+    const parts = path.split('/');
+    let parentFolderId = currentFolder;
+    
+    for (let i = 0; i < parts.length; i++) {
+        const folderName = parts[i];
+        if (!folderName) continue;
+        
+        const currentPath = parts.slice(0, i + 1).join('/');
+        
+        if (folderMap.has(currentPath)) {
+            parentFolderId = folderMap.get(currentPath);
+            continue;
+        }
+        
+        const existingFolder = folders.find(f => 
+            f.name === folderName && 
+            ((parentFolderId === null && !f.parentId) || f.parentId === parentFolderId)
+        );
+        
+        if (existingFolder) {
+            folderMap.set(currentPath, existingFolder.id);
+            parentFolderId = existingFolder.id;
+        } else {
+            try {
+                const response = await fetch('/api/folders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: folderName, parentId: parentFolderId })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    folderMap.set(currentPath, data.folder.id);
+                    parentFolderId = data.folder.id;
+                }
+            } catch (e) {
+                console.error('Failed to create folder:', folderName, e);
+            }
+        }
+    }
+    
+    return parentFolderId;
+}
+
+async function processFileWithPath(file, folderMap) {
+    let filePath = file.webkitRelativePath || file.name;
+    const pathParts = filePath.split('/');
+    const fileName = pathParts.pop();
+    const folderPath = pathParts.join('/');
+    
+    const folderId = await getOrCreateFolder(folderPath, folderMap);
+    
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
+        reader.onload = async (e) => {
+            const fileId = generateShortId();
+            const fileData = {
+                id: fileId,
+                name: fileName,
+                size: file.size,
+                type: file.type,
+                category: getFileCategory(fileName),
+                uploadTime: Date.now(),
+                timeCategory: getTimeCategory(Date.now()),
+                folderId: folderId
+            };
+            
+            try {
+                await fetch('/api/files', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(fileData)
+                });
+                
+                const base64Data = e.target.result.split(',')[1];
+                const binaryData = atob(base64Data);
+                const uint8Array = new Uint8Array(binaryData.length);
+                for (let i = 0; i < binaryData.length; i++) {
+                    uint8Array[i] = binaryData.charCodeAt(i);
+                }
+                
+                await fetch('/api/upload/' + fileId, {
+                    method: 'POST',
+                    body: uint8Array
+                });
+                
+                resolve();
+            } catch (error) {
+                reject(error);
+            }
+        };
+        
+        reader.onerror = () => reject(new Error('文件读取失败'));
+        reader.readAsDataURL(file);
+    });
+}
+
 async function processFiles(fileList) {
     const progress = document.getElementById('uploadProgress');
     const progressFill = document.getElementById('progressFill');
@@ -169,7 +319,7 @@ async function processFiles(fileList) {
     
     for (const file of fileList) {
         try {
-            await processSingleFile(file);
+            await processSingleFile(file, currentFolder);
             processed++;
             const percent = Math.round((processed / total) * 100);
             progressFill.style.width = percent + '%';
@@ -190,7 +340,7 @@ async function processFiles(fileList) {
     }, 500);
 }
 
-async function processSingleFile(file) {
+async function processSingleFile(file, folderId = null) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         
@@ -203,7 +353,8 @@ async function processSingleFile(file) {
                 type: file.type,
                 category: getFileCategory(file.name),
                 uploadTime: Date.now(),
-                timeCategory: getTimeCategory(Date.now())
+                timeCategory: getTimeCategory(Date.now()),
+                folderId: folderId
             };
             
             try {
@@ -337,7 +488,7 @@ function renderFiles() {
     else if (currentSort === 'name') filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     
     const currentFolderData = currentFolder ? folders.find(f => f.id === currentFolder) : null;
-    const showFolders = currentFolder === null && currentCategory === 'all' && currentTimeFilter === 'all';
+    const showFolders = currentCategory === 'all' && currentTimeFilter === 'all';
     
     if (filtered.length === 0 && !showFolders && folders.length === 0) {
         container.innerHTML = '<div class="empty-state"><h3>暂无文件</h3><p>上传文件开始使用</p></div>';
@@ -369,10 +520,12 @@ function renderGridView(container, filtered, showFolders) {
         `;
     }
     
-    if (showFolders && currentFolder === null) {
-        folders.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        folders.forEach(folder => {
+    if (showFolders) {
+        const childFolders = folders.filter(f => f.parentId === currentFolder);
+        childFolders.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        childFolders.forEach(folder => {
             const fileCount = files.filter(f => f.folderId === folder.id).length;
+            const subFolderCount = folders.filter(f => f.parentId === folder.id).length;
             html += `
                 <div class="folder-card" data-folder-id="${folder.id}"
                      ondragover="event.preventDefault(); this.classList.add('dragover');"
@@ -384,7 +537,7 @@ function renderGridView(container, filtered, showFolders) {
                     </div>
                     <div class="folder-info">
                         <div class="folder-name" title="${escapeHtml(folder.name)}">${escapeHtml(folder.name)}</div>
-                        <div class="folder-meta">${fileCount} 个文件</div>
+                        <div class="folder-meta">${fileCount} 个文件${subFolderCount > 0 ? ` · ${subFolderCount} 个子文件夹` : ''}</div>
                         <div class="folder-actions">
                             <button class="file-action-btn" onclick="event.stopPropagation(); renameFolder('${folder.id}')">重命名</button>
                             <button class="file-action-btn delete" onclick="event.stopPropagation(); deleteFolder('${folder.id}')">删除</button>
@@ -455,10 +608,12 @@ function renderListView(container, filtered, showFolders) {
         `;
     }
     
-    if (showFolders && currentFolder === null) {
-        folders.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        folders.forEach(folder => {
+    if (showFolders) {
+        const childFolders = folders.filter(f => f.parentId === currentFolder);
+        childFolders.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        childFolders.forEach(folder => {
             const fileCount = files.filter(f => f.folderId === folder.id).length;
+            const subFolderCount = folders.filter(f => f.parentId === folder.id).length;
             html += `
                 <tr class="folder-row" data-folder-id="${folder.id}"
                     ondragover="event.preventDefault(); this.classList.add('dragover');"
@@ -472,7 +627,7 @@ function renderListView(container, filtered, showFolders) {
                         </div>
                     </td>
                     <td><span class="file-type-badge" style="position:static; background: #ffc107;">文件夹</span></td>
-                    <td>${fileCount} 个文件</td>
+                    <td>${fileCount} 个文件${subFolderCount > 0 ? ` · ${subFolderCount} 个子文件夹` : ''}</td>
                     <td>${formatDate(folder.createdAt || 0)}</td>
                     <td>
                         <div class="file-actions-cell">
@@ -918,7 +1073,7 @@ async function createFolder() {
         const response = await fetch('/api/folders', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: name.trim() })
+            body: JSON.stringify({ name: name.trim(), parentId: currentFolder })
         });
         
         if (response.ok) {
@@ -943,8 +1098,20 @@ function enterFolder(folderId) {
 }
 
 function exitFolder() {
-    currentFolder = null;
-    document.getElementById('folderBreadcrumb').style.display = 'none';
+    if (currentFolder) {
+        const currentFolderData = folders.find(f => f.id === currentFolder);
+        if (currentFolderData && currentFolderData.parentId) {
+            currentFolder = currentFolderData.parentId;
+            const parentFolder = folders.find(f => f.id === currentFolder);
+            document.getElementById('currentFolderName').textContent = parentFolder ? parentFolder.name : '';
+        } else {
+            currentFolder = null;
+            document.getElementById('folderBreadcrumb').style.display = 'none';
+        }
+    } else {
+        currentFolder = null;
+        document.getElementById('folderBreadcrumb').style.display = 'none';
+    }
     renderFiles();
 }
 

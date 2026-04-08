@@ -306,11 +306,17 @@
                 </div>
 
                 <div class="upload-area" id="uploadArea">
-                    <h3>📤 拖拽文件到此处上传</h3>
-                    <p>支持任意大小文件，自动同步到所有设备</p>
-                    <div class="file-input-wrapper">
-                        <button class="btn">选择文件</button>
-                        <input type="file" class="file-input" id="fileInputDrag" multiple onchange="handleFileSelect(event)" accept="*/*">
+                    <h3>📤 拖拽文件或文件夹到此处上传</h3>
+                    <p>支持上传单个文件或整个文件夹，自动保持目录结构</p>
+                    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                        <div class="file-input-wrapper">
+                            <button class="btn">选择文件</button>
+                            <input type="file" class="file-input" id="fileInputDrag" multiple onchange="handleFileSelect(event)" accept="*/*">
+                        </div>
+                        <div class="file-input-wrapper">
+                            <button class="btn btn-folder">选择文件夹</button>
+                            <input type="file" class="file-input" id="folderInput" webkitdirectory directory multiple onchange="handleFolderSelect(event)" accept="*/*">
+                        </div>
                     </div>
                     <div class="progress-bar" id="uploadProgress" style="display: none;">
                         <div class="progress-fill" id="progressFill"></div>

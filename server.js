@@ -306,7 +306,8 @@ function handleApi(req, res) {
                     id: folderId,
                     name: escapeHtml(data.name),
                     createdAt: Date.now(),
-                    fileCount: 0
+                    fileCount: 0,
+                    parentId: data.parentId || null
                 };
                 folders[folderId] = folder;
                 saveFolders();
@@ -346,19 +347,27 @@ function handleApi(req, res) {
         return;
     }
 
+    function deleteFolderRecursive(folderId) {
+        const childFolders = Object.values(folders).filter(f => f.parentId === folderId);
+        childFolders.forEach(child => deleteFolderRecursive(child.id));
+        
+        Object.keys(fileMetadata).forEach(fileId => {
+            if (fileMetadata[fileId].folderId === folderId) {
+                delete fileMetadata[fileId];
+                const filePath = path.join(CONFIG.DATA_DIR, fileId);
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            }
+        });
+        
+        delete folders[folderId];
+    }
+
     if (url.startsWith('/api/folders/') && req.method === 'DELETE') {
         const folderId = url.split('/').pop();
         if (folders[folderId]) {
-            Object.keys(fileMetadata).forEach(fileId => {
-                if (fileMetadata[fileId].folderId === folderId) {
-                    delete fileMetadata[fileId];
-                    const filePath = path.join(CONFIG.DATA_DIR, fileId);
-                    if (fs.existsSync(filePath)) {
-                        fs.unlinkSync(filePath);
-                    }
-                }
-            });
-            delete folders[folderId];
+            deleteFolderRecursive(folderId);
             saveFolders();
             saveMetadata();
             res.writeHead(200, { 'Content-Type': 'application/json' });
