@@ -1,4 +1,5 @@
-$src = "d:\Trae\Code\project14\start_silent.vbs"
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$src = Join-Path $scriptDir "start_silent.vbs"
 $dst = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup\FileVault.vbs"
 Copy-Item $src -Destination $dst -Force
 Write-Host ""
