@@ -437,12 +437,13 @@ function getTypeLabel(category) {
 
 function updateCounts() {
     const rootFolders = folders.filter(f => !f.parentId);
-    const totalItems = files.length + rootFolders.length;
+    const rootFiles = files.filter(f => !f.folderId);
+    const totalItems = rootFiles.length + rootFolders.length;
     
     const counts = { all: totalItems, pdf: 0, word: 0, image: 0, other: 0 };
     const timeCounts = { all: totalItems, today: 0, week: 0, older: 0 };
     
-    files.forEach(f => {
+    rootFiles.forEach(f => {
         counts[f.category]++;
         timeCounts[f.timeCategory]++;
     });
