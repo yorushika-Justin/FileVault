@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { networkInterfaces } = require('os');
 const { createWriteStream, readFileSync } = require('fs');
+const WebSocket = require('ws');
 
 console.log('Starting FileVault server...');
 
@@ -53,6 +54,7 @@ if (fs.existsSync(foldersFile)) {
 function saveMetadata() {
     try {
         fs.writeFileSync(metadataFile, JSON.stringify(fileMetadata, null, 2));
+        broadcast('file_updated', fileMetadata);
     } catch (e) {
         console.error('Failed to save metadata:', e);
     }
@@ -61,9 +63,19 @@ function saveMetadata() {
 function saveFolders() {
     try {
         fs.writeFileSync(foldersFile, JSON.stringify(folders, null, 2));
+        broadcast('folder_updated', folders);
     } catch (e) {
         console.error('Failed to save folders:', e);
     }
+}
+
+function broadcast(type, data) {
+    if (!wss) return;
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ type, data }));
+        }
+    });
 }
 
 function getLocalIP() {
@@ -608,8 +620,18 @@ server.listen(CONFIG.PORT, '0.0.0.0', () => {
     console.log('Local:   http://localhost:' + CONFIG.PORT);
     console.log('LAN:     http://' + localIP + ':' + CONFIG.PORT);
     console.log('Max File Size: 1GB');
+    console.log('WebSocket: Enabled');
     console.log('================================');
     console.log('Press Ctrl+C to stop the server');
+});
+
+const wss = new WebSocket.Server({ server });
+
+wss.on('connection', (ws) => {
+    console.log('WebSocket client connected');
+    ws.on('close', () => {
+        console.log('WebSocket client disconnected');
+    });
 });
 
 server.on('error', (err) => {

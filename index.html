@@ -246,7 +246,7 @@
             .header { padding: 10px 12px; }
             .header h1 { font-size: 16px; }
             .btn { padding: 6px 10px; font-size: 11px; }
-            .container { padding: 12px; }
+            .container { padding: 12px; padding-bottom: 80px; }
             .stats { padding: 12px 16px; gap: 16px; }
             .stat-value { font-size: 18px; }
             .file-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
@@ -258,7 +258,67 @@
             .modal-content { padding: 16px; }
             .sync-status { top: 60px; right: 12px; font-size: 10px; }
             .file-table th, .file-table td { padding: 8px 6px; font-size: 11px; }
+            .header-actions { display: none; }
+            .mobile-nav { display: flex; }
+            .main { padding-bottom: 20px; }
         }
+        
+        .mobile-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(255,255,255,0.98);
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            padding: 8px 10px;
+            padding-bottom: max(8px, env(safe-area-inset-bottom));
+            z-index: 100;
+            justify-content: space-around;
+        }
+        .mobile-nav-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            background: none;
+            border: none;
+            color: #999;
+            font-size: 11px;
+            cursor: pointer;
+            padding: 6px 12px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .mobile-nav-btn .icon { font-size: 22px; }
+        .mobile-nav-btn.active { color: #667eea; background: rgba(102, 126, 234, 0.1); }
+        .mobile-nav-btn:active { transform: scale(0.95); }
+        
+        .view-section { display: block; }
+        .view-section.hidden { display: none; }
+        
+        .mobile-upload-section {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .mobile-upload-section.active { display: block; }
+        .mobile-upload-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 8px;
+        }
+        .mobile-upload-btn:active { transform: scale(0.98); }
+        .mobile-upload-btn.secondary { background: #fff; color: #667eea; border: 2px solid #667eea; }
     </style>
 </head>
 <body>
@@ -349,6 +409,18 @@
                         <div class="progress-fill" id="progressFill"></div>
                     </div>
                 </div>
+                
+                <div class="mobile-upload-section" id="mobileUploadSection">
+                    <h3 style="margin-bottom: 16px;">📱 移动端上传</h3>
+                    <div class="file-input-wrapper">
+                        <button class="mobile-upload-btn">📷 拍照/选图</button>
+                        <input type="file" class="file-input" accept="image/*" capture="environment" onchange="handleMobileImageUpload(event)">
+                    </div>
+                    <div class="file-input-wrapper">
+                        <button class="mobile-upload-btn secondary">📂 选择文件</button>
+                        <input type="file" class="file-input" multiple onchange="handleFileSelect(event)">
+                    </div>
+                </div>
 
                 <div class="file-list">
                     <div class="file-list-header">
@@ -388,6 +460,21 @@
                 </div>
             </main>
         </div>
+    </div>
+    
+    <div class="mobile-nav" id="mobileNav">
+        <button class="mobile-nav-btn active" id="navFiles" onclick="switchMobileTab('files')">
+            <span class="icon">📁</span>
+            <span>文件</span>
+        </button>
+        <button class="mobile-nav-btn" id="navUpload" onclick="switchMobileTab('upload')">
+            <span class="icon">📤</span>
+            <span>上传</span>
+        </button>
+        <button class="mobile-nav-btn" id="navShare" onclick="switchMobileTab('share')">
+            <span class="icon">🔗</span>
+            <span>分享</span>
+        </button>
     </div>
 
     <div class="modal" id="shareModal">

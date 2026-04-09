@@ -16,6 +16,8 @@ const LIST_VIEW_THRESHOLD = 10;
 const imageCache = new Map();
 let contextMenuTarget = null;
 let contextMenuType = null;
+let ws = null;
+let wsReconnectTimer = null;
 
 async function fetchLocalIP() {
     try {
@@ -110,16 +112,86 @@ async function init() {
         await fetchLocalIP();
         await fetchPort();
         updateConnectionStatus(true);
+        
+        initWebSocket();
+        
         setInterval(async () => {
-            await fetchFilesFromServer();
-            await fetchFoldersFromServer();
-        }, 5000);
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                await fetchFilesFromServer();
+                await fetchFoldersFromServer();
+            }
+        }, 30000);
+        
         await fetchFoldersFromServer();
         await fetchFilesFromServer();
         setupDragAndDrop();
+        setupTouchFeedback();
+        setupLongPress();
     } catch (error) {
         console.error('Initialization error:', error);
         updateConnectionStatus(false);
+    }
+}
+
+function initWebSocket() {
+    try {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}`;
+        
+        ws = new WebSocket(wsUrl);
+        
+        ws.onopen = () => {
+            console.log('WebSocket connected');
+            updateConnectionStatus(true);
+            if (wsReconnectTimer) {
+                clearTimeout(wsReconnectTimer);
+                wsReconnectTimer = null;
+            }
+        };
+        
+        ws.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                if (message.type === 'file_updated') {
+                    console.log('File updated via WebSocket');
+                    const newFilesJSON = JSON.stringify(message.data);
+                    if (newFilesJSON !== previousFilesJSON) {
+                        files = message.data;
+                        previousFilesJSON = newFilesJSON;
+                        updateCounts();
+                        renderFiles();
+                        autoSwitchViewMode();
+                    }
+                } else if (message.type === 'folder_updated') {
+                    console.log('Folder updated via WebSocket');
+                    const newFoldersJSON = JSON.stringify(message.data);
+                    if (newFoldersJSON !== previousFoldersJSON) {
+                        folders = message.data;
+                        previousFoldersJSON = newFoldersJSON;
+                        renderFiles();
+                    }
+                }
+            } catch (e) {
+                console.error('WebSocket message parse error:', e);
+            }
+        };
+        
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+        
+        ws.onclose = () => {
+            console.log('WebSocket disconnected, reconnecting...');
+            ws = null;
+            if (!wsReconnectTimer) {
+                wsReconnectTimer = setTimeout(() => {
+                    wsReconnectTimer = null;
+                    initWebSocket();
+                }, 5000);
+            }
+        };
+    } catch (e) {
+        console.error('WebSocket init error:', e);
     }
 }
 
@@ -1468,5 +1540,91 @@ document.addEventListener('contextmenu', function(event) {
         hideContextMenu();
     }
 });
+
+function setupTouchFeedback() {
+    const buttons = document.querySelectorAll('.btn, .file-card, .folder-card');
+    
+    buttons.forEach(btn => {
+        btn.addEventListener('touchstart', function() {
+            this.style.transform = 'scale(0.98)';
+        }, { passive: true });
+        
+        btn.addEventListener('touchend', function() {
+            this.style.transform = '';
+        }, { passive: true });
+    });
+}
+
+function setupLongPress() {
+    document.addEventListener('touchstart', function(e) {
+        const target = e.target.closest('.file-card, .folder-card');
+        if (!target) return;
+        
+        const timer = setTimeout(() => {
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('contextmenu', {
+                bubbles: true,
+                cancelable: true,
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            target.dispatchEvent(mouseEvent);
+        }, 500);
+        
+        target._longPressTimer = timer;
+    }, { passive: true });
+    
+    document.addEventListener('touchend', function(e) {
+        const target = e.target.closest('.file-card, .folder-card');
+        if (target && target._longPressTimer) {
+            clearTimeout(target._longPressTimer);
+            target._longPressTimer = null;
+        }
+    }, { passive: true });
+    
+    document.addEventListener('touchmove', function(e) {
+        const target = e.target.closest('.file-card, .folder-card');
+        if (target && target._longPressTimer) {
+            clearTimeout(target._longPressTimer);
+            target._longPressTimer = null;
+        }
+    }, { passive: true });
+}
+
+function switchMobileTab(tabName) {
+    const uploadArea = document.getElementById('uploadArea');
+    const mobileUploadSection = document.getElementById('mobileUploadSection');
+    const fileList = document.querySelector('.file-list');
+    const stats = document.querySelector('.stats');
+    
+    document.querySelectorAll('.mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById('nav' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.add('active');
+    
+    if (tabName === 'files') {
+        uploadArea.style.display = 'block';
+        mobileUploadSection.classList.remove('active');
+        fileList.style.display = 'block';
+        stats.style.display = 'flex';
+    } else if (tabName === 'upload') {
+        uploadArea.style.display = 'none';
+        mobileUploadSection.classList.add('active');
+        fileList.style.display = 'none';
+        stats.style.display = 'none';
+    } else if (tabName === 'share') {
+        uploadArea.style.display = 'none';
+        mobileUploadSection.classList.remove('active');
+        fileList.style.display = 'none';
+        stats.style.display = 'none';
+        openSelectShareModal();
+    }
+}
+
+async function handleMobileImageUpload(event) {
+    const files = Array.from(event.target.files);
+    if (files.length > 0) {
+        await processFiles(files);
+    }
+    event.target.value = '';
+}
 
 window.addEventListener('load', init);
