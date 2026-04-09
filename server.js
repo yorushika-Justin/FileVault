@@ -12,6 +12,17 @@ const CONFIG = {
     DATA_DIR: path.join(__dirname, 'data')
 };
 
+function isValidFileId(fileId) {
+    return /^[a-zA-Z0-9_\-\.]+$/.test(fileId);
+}
+
+function getSafeFilePath(fileId) {
+    const filePath = path.join(CONFIG.DATA_DIR, fileId);
+    const resolvedPath = path.resolve(filePath);
+    const resolvedDataDir = path.resolve(CONFIG.DATA_DIR);
+    return resolvedPath.startsWith(resolvedDataDir) ? resolvedPath : null;
+}
+
 if (!fs.existsSync(CONFIG.DATA_DIR)) {
     fs.mkdirSync(CONFIG.DATA_DIR, { recursive: true });
 }
@@ -211,6 +222,20 @@ function handleApi(req, res) {
 
     if (url.startsWith('/api/upload/') && req.method === 'POST') {
         const fileId = url.split('/').pop();
+        
+        if (!isValidFileId(fileId)) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Invalid file ID' }));
+            return;
+        }
+        
+        const filePath = getSafeFilePath(fileId);
+        if (!filePath) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Access denied' }));
+            return;
+        }
+        
         const chunks = [];
         let totalSize = 0;
         
@@ -243,7 +268,21 @@ function handleApi(req, res) {
 
     if (url.startsWith('/api/download/') && req.method === 'GET') {
         const fileId = url.split('/').pop();
-        const filePath = path.join(CONFIG.DATA_DIR, fileId);
+        
+        if (!isValidFileId(fileId)) {
+            console.error('Invalid fileId:', fileId);
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Invalid file ID' }));
+            return;
+        }
+        
+        const filePath = getSafeFilePath(fileId);
+        if (!filePath) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Access denied' }));
+            return;
+        }
+        
         const metadata = fileMetadata[fileId];
         
         if (metadata && fs.existsSync(filePath)) {
