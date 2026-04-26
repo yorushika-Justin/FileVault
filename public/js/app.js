@@ -46,7 +46,9 @@ async function fetchPort() {
 function getLocalIP() {
     if (detectedLocalIP) return detectedLocalIP;
     const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') return '192.168.31.61';
+    if (host === 'localhost' || host === '127.0.0.1') {
+        return null;
+    }
     return host;
 }
 
@@ -815,6 +817,10 @@ function showFileQR(fileId) {
     }
 
     const localIP = getLocalIP();
+    if (!localIP) {
+        showToast('请通过局域网IP访问以使用分享功能', 'error');
+        return;
+    }
     const port = detectedPort || window.location.port || '8888';
     const shareUrl = 'http://' + localIP + ':' + port + '/share.html?f=' + fileId;
 
@@ -834,6 +840,10 @@ function showFolderQR(folderId) {
     }
 
     const localIP = getLocalIP();
+    if (!localIP) {
+        showToast('请通过局域网IP访问以使用分享功能', 'error');
+        return;
+    }
     const port = detectedPort || window.location.port || '8888';
     const shareUrl = 'http://' + localIP + ':' + port + '/share.html?folder=' + folderId;
 
@@ -1022,14 +1032,14 @@ function generateQRCode(text, containerId) {
     }
 
     try {
-        const qr = qrcode(0, 'L');
+        const qr = qrcode(0, 'M');
         qr.addData(text);
         qr.make();
 
         const moduleCount = qr.getModuleCount();
-        const size = 180;
-        const margin = 10;
-        const moduleSize = Math.max(2, (size - 2 * margin) / moduleCount);
+        const size = 220;
+        const margin = 12;
+        const moduleSize = Math.max(3, (size - 2 * margin) / moduleCount);
         const actualSize = moduleSize * moduleCount + 2 * margin;
 
         const canvas = document.createElement('canvas');
