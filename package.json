@@ -1,14 +1,16 @@
 {
   "name": "filevault",
-  "version": "4.1.0",
-  "description": "FileVault - 多端文件同步系统",
-  "main": "server.js",
-  "author": "FileVault Team",
-  "license": "MIT",
+  "version": "5.0.0",
+  "description": "FileVault - 局域网文件同步系统",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
   "dependencies": {
+    "better-sqlite3": "^11.0.0",
     "ws": "^8.20.0"
-  }
+  },
+  "author": "FileVault Team",
+  "license": "MIT"
 }
