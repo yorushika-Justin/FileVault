@@ -826,6 +826,9 @@ function showFileQR(fileId) {
 
     document.getElementById('shareFileName').textContent = file.name;
     document.getElementById('shareLinkInput').value = shareUrl;
+    const shareUrlLink = document.getElementById('shareUrlLink');
+    shareUrlLink.href = shareUrl;
+    shareUrlLink.textContent = shareUrl;
 
     generateQRCode(shareUrl, 'qrCodeContainer');
 
@@ -849,6 +852,9 @@ function showFolderQR(folderId) {
 
     document.getElementById('shareFileName').textContent = folder.name + ' (文件夹)';
     document.getElementById('shareLinkInput').value = shareUrl;
+    const shareUrlLink = document.getElementById('shareUrlLink');
+    shareUrlLink.href = shareUrl;
+    shareUrlLink.textContent = shareUrl;
 
     generateQRCode(shareUrl, 'qrCodeContainer');
 
