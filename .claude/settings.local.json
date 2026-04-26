@@ -5,7 +5,9 @@
       "Bash(git commit *)",
       "Bash(npm install *)",
       "Bash(timeout 5 node server.js)",
-      "Bash(ipconfig)"
+      "Bash(ipconfig)",
+      "Bash(timeout 3 node server.js)",
+      "Bash(git push *)"
     ]
   }
 }
