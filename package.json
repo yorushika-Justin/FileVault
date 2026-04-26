@@ -8,7 +8,7 @@
     "dev": "node server.js"
   },
   "dependencies": {
-    "better-sqlite3": "^11.0.0",
+    "sql.js": "^1.10.0",
     "ws": "^8.20.0"
   },
   "author": "FileVault Team",
