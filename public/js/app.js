@@ -1032,19 +1032,21 @@ function generateQRCode(text, containerId) {
     }
 
     try {
-        const qr = qrcode(0, 'M');
+        const qr = qrcode(0, 'L');
         qr.addData(text);
         qr.make();
 
         const moduleCount = qr.getModuleCount();
-        const size = 220;
-        const margin = 12;
-        const moduleSize = Math.max(3, (size - 2 * margin) / moduleCount);
+        const size = 280;
+        const margin = 8;
+        const moduleSize = Math.max(4, (size - 2 * margin) / moduleCount);
         const actualSize = moduleSize * moduleCount + 2 * margin;
 
         const canvas = document.createElement('canvas');
         canvas.width = actualSize;
         canvas.height = actualSize;
+        canvas.style.display = 'block';
+        canvas.style.margin = '0 auto';
         const ctx = canvas.getContext('2d');
 
         ctx.fillStyle = '#ffffff';
