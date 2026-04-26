@@ -873,15 +873,17 @@ function openSelectShareModal() {
 
         if (rootFiles.length > 0) {
             html += '<div style="font-size: 12px; font-weight: 700; color: #667eea; margin-bottom: 8px; padding: 0 8px; margin-top: 16px;">文件</div>';
-            rootFiles.forEach(f => `
-                <div class="file-share-item" onclick="showFileQR('${f.id}'); closeSelectShareModal();">
-                    <span style="font-size: 20px; margin-right: 10px;">${getFileIcon(f.category)}</span>
-                    <div>
-                        <div style="font-weight: 600; font-size: 13px;">${escapeHtml(f.name)}</div>
-                        <div style="font-size: 11px; color: #999;">${formatFileSize(f.size || 0)}</div>
+            rootFiles.forEach(f => {
+                html += `
+                    <div class="file-share-item" onclick="showFileQR('${f.id}'); closeSelectShareModal();">
+                        <span style="font-size: 20px; margin-right: 10px;">${getFileIcon(f.category)}</span>
+                        <div>
+                            <div style="font-weight: 600; font-size: 13px;">${escapeHtml(f.name)}</div>
+                            <div style="font-size: 11px; color: #999;">${formatFileSize(f.size || 0)}</div>
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            });
         }
 
         shareList.innerHTML = html;
