@@ -21,9 +21,8 @@ function getDb() {
 async function initDatabase() {
     await initSql();
 
-    if (!fs.existsSync(path.dirname(DB_PATH))) {
-        fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-    }
+    const dbDir = path.dirname(DB_PATH);
+    fs.mkdirSync(dbDir, { recursive: true });
 
     if (fs.existsSync(DB_PATH)) {
         const buffer = fs.readFileSync(DB_PATH);

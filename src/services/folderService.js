@@ -4,6 +4,8 @@ const dbService = require('./dbService');
 const { escapeHtml, generateFolderId } = require('../middleware/security');
 const CONFIG = require('../config');
 
+const TYPE = { FILE: 'file', FOLDER: 'folder' };
+
 function deleteFolderRecursive(folderId) {
     const childFolders = dbService.getFoldersByParent(folderId);
     childFolders.forEach(child => deleteFolderRecursive(child.id));
@@ -11,13 +13,19 @@ function deleteFolderRecursive(folderId) {
     const files = dbService.getFilesByFolder(folderId);
     files.forEach(file => {
         const filePath = path.join(CONFIG.DATA_DIR, file.id);
-        if (fs.existsSync(filePath)) {
+        try {
             fs.unlinkSync(filePath);
+        } catch (e) {
+            // File may not exist
         }
         dbService.deleteFile(file.id);
     });
 
     dbService.deleteFolder(folderId);
+}
+
+function makeEntry(type, id, name, filePath) {
+    return { type, id, name, path: filePath };
 }
 
 function collectFolderContents(folderId, basePath = '') {
@@ -27,22 +35,12 @@ function collectFolderContents(folderId, basePath = '') {
 
     folderFiles.forEach(file => {
         const filePath = basePath ? basePath + '/' + file.name : file.name;
-        contents.push({
-            type: 'file',
-            id: file.id,
-            name: file.name,
-            path: filePath
-        });
+        contents.push(makeEntry(TYPE.FILE, file.id, file.name, filePath));
     });
 
     childFolders.forEach(folder => {
         const folderPath = basePath ? basePath + '/' + folder.name : folder.name;
-        contents.push({
-            type: 'folder',
-            id: folder.id,
-            name: folder.name,
-            path: folderPath
-        });
+        contents.push(makeEntry(TYPE.FOLDER, folder.id, folder.name, folderPath));
         const childContents = collectFolderContents(folder.id, folderPath);
         contents.push(...childContents);
     });

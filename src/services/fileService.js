@@ -131,8 +131,10 @@ function deleteFileWithData(fileId) {
     const file = dbService.getFileById(fileId);
     if (file) {
         const filePath = path.join(CONFIG.DATA_DIR, fileId);
-        if (fs.existsSync(filePath)) {
+        try {
             fs.unlinkSync(filePath);
+        } catch (e) {
+            // File may not exist on disk, that's ok
         }
         dbService.deleteFile(fileId);
         return true;

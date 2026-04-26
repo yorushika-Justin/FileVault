@@ -3,7 +3,9 @@
     "allow": [
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(timeout 5 node server.js)",
+      "Bash(ipconfig)"
     ]
   }
 }
