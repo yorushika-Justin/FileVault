@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FileVault - 多端文件同步系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js" async></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .header {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .header h1 {
+            font-size: 18px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .search-box { display: flex; align-items: center; background: #f5f5f5; border-radius: 8px; padding: 6px 12px; }
+        .search-box input { border: none; background: none; outline: none; font-size: 13px; width: 150px; }
+        .search-box .icon { margin-right: 6px; }
+        .btn {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            transition: all 0.3s;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
+        .btn-secondary { background: #fff; color: #667eea; border: 2px solid #667eea; }
+        .btn-secondary:hover { background: #667eea; color: #fff; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 16px; }
+        .layout { display: grid; grid-template-columns: 200px 1fr; gap: 16px; }
+        .sidebar {
+            background: rgba(255,255,255,0.95);
+            border-radius: 12px;
+            padding: 16px;
+            height: fit-content;
+            position: sticky;
+            top: 80px;
+        }
+        .filter-group { margin-bottom: 20px; }
+        .filter-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #667eea; margin-bottom: 10px; }
+        .filter-item {
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+            transition: all 0.2s;
+        }
+        .filter-item:hover, .filter-item.active { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; }
+        .filter-count { font-size: 11px; opacity: 0.8; background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 8px; }
+        .main { display: flex; flex-direction: column; gap: 16px; }
+        .stats { display: flex; gap: 20px; padding: 14px 20px; background: rgba(255,255,255,0.95); border-radius: 12px; }
+        .stat-value { font-size: 20px; font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .stat-label { font-size: 12px; color: #999; }
+        .upload-area {
+            background: rgba(255,255,255,0.95);
+            border: 2px dashed rgba(102, 126, 234, 0.3);
+            padding: 30px 20px;
+            text-align: center;
+            border-radius: 12px;
+            transition: all 0.3s;
+        }
+        .upload-area.dragover { border-color: #667eea; background: rgba(102, 126, 234, 0.05); }
+        .upload-area h3 { font-size: 16px; margin-bottom: 8px; }
+        .upload-area p { font-size: 12px; color: #999; margin-bottom: 16px; }
+        .file-input-wrapper { position: relative; display: inline-block; }
+        .file-input { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        .file-list { background: rgba(255,255,255,0.95); border-radius: 12px; padding: 16px; }
+        .file-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+        .file-list-header h3 { font-size: 16px; }
+        .view-toggle { display: flex; gap: 4px; }
+        .view-btn { padding: 6px 12px; border: none; background: #f5f5f5; border-radius: 4px; cursor: pointer; font-size: 11px; }
+        .view-btn.active { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; }
+
+        .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+        .file-card { background: #fafafa; border-radius: 10px; overflow: hidden; transition: all 0.3s; cursor: pointer; }
+        .file-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+        .file-preview {
+            height: 120px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .file-preview img { max-width: 100%; max-height: 100%; object-fit: contain; background: #fff; opacity: 0; transition: opacity 0.3s ease; }
+        .file-preview img.loaded { opacity: 1; }
+        .file-preview .img-placeholder { font-size: 40px; transition: opacity 0.3s; }
+        .file-type-badge {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #fff;
+        }
+        .file-type-badge.pdf { background: #ef5350; }
+        .file-type-badge.word { background: #2196f3; }
+        .file-type-badge.docx { background: #2196f3; }
+        .file-type-badge.image { background: #4caf50; }
+        .file-type-badge.video { background: #9c27b0; }
+        .file-type-badge.audio { background: #ff9800; }
+        .file-type-badge.document { background: #2196f3; }
+        .type-badge.other, .file-type-badge.other { background: #9e9e9e; }
+        .file-info { padding: 10px; }
+
+        .context-menu {
+            position: fixed;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            padding: 8px 0;
+            min-width: 160px;
+            z-index: 10000;
+            display: none;
+        }
+        .context-menu-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .context-menu-item:hover { background: #f5f5f5; }
+        .context-menu-item .icon { width: 18px; text-align: center; }
+        .context-menu-divider { height: 1px; background: #eee; margin: 4px 0; }
+        .file-name { font-size: 12px; font-weight: 600; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-meta { font-size: 10px; color: #999; margin-bottom: 8px; }
+        .file-actions { display: flex; gap: 4px; }
+        .file-action-btn { flex: 1; padding: 6px; border: none; border-radius: 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; cursor: pointer; font-size: 10px; }
+        .file-action-btn.delete:hover { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%); }
+
+        .select-mode-bar { display: none; align-items: center; gap: 12px; padding: 10px 16px; background: #fff3e0; border-radius: 8px; margin-bottom: 12px; }
+        .select-mode-bar.active { display: flex; }
+        .select-mode-bar .selected-count { font-size: 13px; color: #e65100; font-weight: 600; }
+        .select-mode-bar .btn { padding: 6px 12px; font-size: 11px; }
+        .select-mode-bar .btn-delete-all { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%); }
+        .select-mode-bar .btn-cancel { background: #9e9e9e; }
+
+        .file-card.selected { box-shadow: 0 0 0 3px #667eea; }
+        .file-checkbox { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; background: #fff; border: 2px solid #ddd; border-radius: 4px; cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 14px; color: #667eea; z-index: 10; transition: all 0.2s; }
+        .file-checkbox:hover { border-color: #667eea; }
+        .file-checkbox.checked { background: #667eea; border-color: #667eea; color: #fff; }
+        .select-mode .file-checkbox { display: flex; }
+
+        .file-table .file-checkbox { position: static; width: 18px; height: 18px; margin-right: 8px; flex-shrink: 0; }
+        .file-table tr.selected { background: #e3f2fd; }
+
+        .folder-card { background: #fff3e0; border-radius: 10px; overflow: hidden; transition: all 0.3s; border: 2px solid #ffe0b2; cursor: pointer; }
+        .folder-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(255, 152, 0, 0.2); border-color: #ffb74d; }
+        .folder-card.dragover { border-color: #667eea; background: #e8eaf6; transform: scale(1.02); }
+        .folder-preview { height: 120px; display: flex; justify-content: center; align-items: center; background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%); }
+        .folder-icon { font-size: 48px; }
+        .folder-info { padding: 10px; }
+        .folder-name { font-size: 12px; font-weight: 600; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .folder-meta { font-size: 10px; color: #999; margin-bottom: 8px; }
+        .folder-actions { display: flex; gap: 4px; }
+        .folder-row.dragover { background: #fff3e0 !important; border: 2px dashed #ffb74d; }
+        .folder-breadcrumb { display: none; align-items: center; gap: 8px; padding: 8px 12px; background: #fff3e0; border-radius: 6px; margin-bottom: 12px; font-size: 13px; }
+        .folder-breadcrumb .folder-icon { font-size: 16px; }
+        .folder-breadcrumb .folder-name { font-weight: 600; color: #e65100; }
+        .breadcrumb-item { cursor: pointer; color: #667eea; }
+        .breadcrumb-item:hover { text-decoration: underline; }
+        .btn-folder { background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); }
+
+        .file-table { width: 100%; border-collapse: collapse; }
+        .file-table th { text-align: left; padding: 12px 10px; background: #f5f5f5; font-size: 12px; font-weight: 600; color: #666; border-bottom: 2px solid #eee; }
+        .file-table td { padding: 10px; border-bottom: 1px solid #eee; font-size: 12px; }
+        .file-table tr:hover { background: #f9f9f9; }
+        .file-table .file-icon { font-size: 20px; margin-right: 8px; vertical-align: middle; }
+        .file-table .file-name-cell { display: flex; align-items: center; }
+        .file-table .file-name-cell img { width: 32px; height: 32px; object-fit: contain; margin-right: 8px; border-radius: 4px; background: #f5f5f5; }
+        .file-table .file-actions-cell { display: flex; gap: 6px; }
+        .file-table .file-action-btn { padding: 4px 10px; font-size: 11px; }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: #999; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; padding: 16px; }
+        .modal.active { display: flex; }
+        .modal-content { background: #fff; border-radius: 16px; padding: 20px; max-width: 400px; width: 100%; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .modal-header h2 { font-size: 18px; }
+        .modal-close { width: 32px; height: 32px; border-radius: 8px; border: none; background: #f5f5f5; cursor: pointer; font-size: 18px; }
+        .qr-code { text-align: center; padding: 16px; background: #fafafa; border-radius: 12px; margin-top: 16px; }
+        .qr-code canvas { max-width: 100%; }
+        .progress-bar { height: 6px; background: #eee; border-radius: 3px; margin-top: 16px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); width: 0%; transition: width 0.3s; }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 12px 20px; background: #333; color: #fff; border-radius: 8px; z-index: 2000; font-size: 13px; max-width: 90%; text-align: center; }
+        .toast.success { background: linear-gradient(135deg, #2e7d32 0%, #4caf50 100%); }
+        .toast.error { background: linear-gradient(135deg, #c62828 0%, #ef5350 100%); }
+        .toast.info { background: linear-gradient(135deg, #1565c0 0%, #42a5f5 100%); }
+        .sync-status { position: fixed; top: 70px; right: 16px; padding: 8px 12px; background: rgba(255,255,255,0.95); border-radius: 6px; font-size: 11px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .sync-status.connected { border-left: 4px solid #4caf50; }
+        .sync-status.disconnected { border-left: 4px solid #ff9800; }
+        .preview-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; }
+        .preview-modal.active { display: flex; }
+        .preview-modal img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .preview-loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; font-size: 18px; }
+        .preview-close { position: absolute; top: 16px; right: 16px; width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(255,255,255,0.2); color: #fff; cursor: pointer; font-size: 24px; }
+        .share-link-container input { width: 100%; padding: 10px; border: 2px solid #eee; border-radius: 8px; margin-bottom: 12px; font-size: 12px; }
+        .file-share-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; align-items: center; transition: background 0.2s; }
+        .file-share-item:hover { background: #f5f5f5; }
+
+        @media (max-width: 900px) {
+            .layout { grid-template-columns: 1fr; }
+            .sidebar { display: flex; gap: 12px; overflow-x: auto; position: static; padding: 12px; }
+            .filter-group { display: flex; gap: 8px; margin: 0; flex-wrap: nowrap; }
+            .filter-title { display: none; }
+            .filter-item { white-space: nowrap; }
+        }
+        @media (max-width: 600px) {
+            .header { padding: 10px 12px; }
+            .header h1 { font-size: 16px; }
+            .btn { padding: 6px 10px; font-size: 11px; }
+            .container { padding: 12px; padding-bottom: 80px; }
+            .stats { padding: 12px 16px; gap: 16px; }
+            .stat-value { font-size: 18px; }
+            .file-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+            .file-preview { height: 90px; }
+            .file-info { padding: 8px; }
+            .file-name { font-size: 11px; }
+            .file-meta { font-size: 9px; }
+            .file-action-btn { padding: 5px; font-size: 9px; }
+            .modal-content { padding: 16px; }
+            .sync-status { top: 60px; right: 12px; font-size: 10px; }
+            .file-table th, .file-table td { padding: 8px 6px; font-size: 11px; }
+            .header-actions { display: none; }
+            .mobile-nav { display: flex; }
+            .main { padding-bottom: 20px; }
+            .search-box { display: none; }
+        }
+
+        .mobile-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(255,255,255,0.98);
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            padding: 8px 10px;
+            padding-bottom: max(8px, env(safe-area-inset-bottom));
+            z-index: 100;
+            justify-content: space-around;
+        }
+        .mobile-nav-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            background: none;
+            border: none;
+            color: #999;
+            font-size: 11px;
+            cursor: pointer;
+            padding: 6px 12px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .mobile-nav-btn .icon { font-size: 22px; }
+        .mobile-nav-btn.active { color: #667eea; background: rgba(102, 126, 234, 0.1); }
+        .mobile-nav-btn:active { transform: scale(0.95); }
+
+        .mobile-upload-section {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .mobile-upload-section.active { display: block; }
+        .mobile-upload-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 8px;
+        }
+        .mobile-upload-btn:active { transform: scale(0.98); }
+        .mobile-upload-btn.secondary { background: #fff; color: #667eea; border: 2px solid #667eea; }
+
+        .rename-input {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            font-size: 12px;
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>FileVault</h1>
+        <div class="header-actions">
+            <div class="search-box">
+                <span class="icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="搜索文件..." oninput="handleSearch(this.value)">
+            </div>
+            <button class="btn btn-secondary" onclick="exportData()">导出</button>
+        </div>
+    </header>
+
+    <div class="sync-status connected" id="syncStatus">
+        <span id="syncStatusText">🟢 已连接服务器</span>
+    </div>
+
+    <div class="container">
+        <div class="layout">
+            <aside class="sidebar">
+                <div class="filter-group">
+                    <div class="filter-title">分类</div>
+                    <div class="filter-item active" data-filter="all" onclick="setCategory('all')">
+                        <span>全部</span>
+                        <span class="filter-count" id="count-all">0</span>
+                    </div>
+                    <div class="filter-item" data-filter="image" onclick="setCategory('image')">
+                        <span>图片</span>
+                        <span class="filter-count" id="count-image">0</span>
+                    </div>
+                    <div class="filter-item" data-filter="document" onclick="setCategory('document')">
+                        <span>文档</span>
+                        <span class="filter-count" id="count-document">0</span>
+                    </div>
+                    <div class="filter-item" data-filter="video" onclick="setCategory('video')">
+                        <span>视频</span>
+                        <span class="filter-count" id="count-video">0</span>
+                    </div>
+                    <div class="filter-item" data-filter="audio" onclick="setCategory('audio')">
+                        <span>音频</span>
+                        <span class="filter-count" id="count-audio">0</span>
+                    </div>
+                    <div class="filter-item" data-filter="other" onclick="setCategory('other')">
+                        <span>其他</span>
+                        <span class="filter-count" id="count-other">0</span>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-title">时间</div>
+                    <div class="filter-item active" data-time="all" onclick="setTimeFilter('all')">
+                        <span>全部</span>
+                        <span class="filter-count" id="time-count-all">0</span>
+                    </div>
+                    <div class="filter-item" data-time="today" onclick="setTimeFilter('today')">
+                        <span>今天</span>
+                        <span class="filter-count" id="time-count-today">0</span>
+                    </div>
+                    <div class="filter-item" data-time="week" onclick="setTimeFilter('week')">
+                        <span>本周</span>
+                        <span class="filter-count" id="time-count-week">0</span>
+                    </div>
+                    <div class="filter-item" data-time="older" onclick="setTimeFilter('older')">
+                        <span>更早</span>
+                        <span class="filter-count" id="time-count-older">0</span>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="main">
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="stat-value" id="total-files">0</span>
+                        <span class="stat-label">个文件</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="total-size">0 KB</span>
+                        <span class="stat-label">总大小</span>
+                    </div>
+                </div>
+
+                <div class="upload-area" id="uploadArea">
+                    <h3>📤 拖拽文件或文件夹到此处上传</h3>
+                    <p>支持上传单个文件或整个文件夹，自动保持目录结构</p>
+                    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                        <div class="file-input-wrapper">
+                            <button class="btn">选择文件</button>
+                            <input type="file" class="file-input" id="fileInputDrag" multiple onchange="handleFileSelect(event)" accept="*/*">
+                        </div>
+                        <div class="file-input-wrapper">
+                            <button class="btn btn-folder">选择文件夹</button>
+                            <input type="file" class="file-input" id="folderInput" webkitdirectory directory multiple onchange="handleFolderSelect(event)" accept="*/*">
+                        </div>
+                    </div>
+                    <div class="progress-bar" id="uploadProgress" style="display: none;">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+
+                <div class="mobile-upload-section" id="mobileUploadSection">
+                    <h3 style="margin-bottom: 16px;">📱 移动端上传</h3>
+                    <div class="file-input-wrapper">
+                        <button class="mobile-upload-btn">📷 拍照/选图</button>
+                        <input type="file" class="file-input" accept="image/*" capture="environment" onchange="handleMobileImageUpload(event)">
+                    </div>
+                    <div class="file-input-wrapper">
+                        <button class="mobile-upload-btn secondary">📂 选择文件</button>
+                        <input type="file" class="file-input" multiple onchange="handleFileSelect(event)">
+                    </div>
+                </div>
+
+                <div class="file-list">
+                    <div class="file-list-header">
+                        <h3>📁 文件列表</h3>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button class="btn btn-folder" onclick="createFolder()">新建文件夹</button>
+                            <button class="btn" onclick="openSelectShareModal()">分享</button>
+                            <button class="btn btn-secondary" id="selectModeBtn" onclick="toggleSelectMode()">选择</button>
+                            <div class="view-toggle">
+                                <button class="view-btn active" id="gridViewBtn" onclick="setViewMode('grid')">卡片</button>
+                                <button class="view-btn" id="listViewBtn" onclick="setViewMode('list')">列表</button>
+                            </div>
+                            <select id="sortSelect" onchange="setSortOption()" style="padding: 8px; border-radius: 8px; border: 2px solid #eee; font-size: 12px;">
+                                <option value="newest">最新优先</option>
+                                <option value="oldest">最早优先</option>
+                                <option value="name">按名称</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="folder-breadcrumb" id="folderBreadcrumb">
+                        <span class="folder-icon">📁</span>
+                        <span class="folder-name" id="currentFolderName"></span>
+                        <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="exitFolder()">返回</button>
+                    </div>
+                    <div class="select-mode-bar" id="selectModeBar">
+                        <span class="selected-count" id="selectedCount">已选择 0 个文件</span>
+                        <button class="btn" onclick="selectAllFiles()">全选</button>
+                        <button class="btn btn-delete-all" onclick="deleteSelectedFiles()">删除选中</button>
+                        <button class="btn btn-cancel" onclick="toggleSelectMode()">取消</button>
+                    </div>
+                    <div id="fileContainer">
+                        <div class="empty-state">
+                            <h3>暂无文件</h3>
+                            <p>上传文件开始同步</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div class="mobile-nav" id="mobileNav">
+        <button class="mobile-nav-btn active" id="navFiles" onclick="switchMobileTab('files')">
+            <span class="icon">📁</span>
+            <span>文件</span>
+        </button>
+        <button class="mobile-nav-btn" id="navUpload" onclick="switchMobileTab('upload')">
+            <span class="icon">📤</span>
+            <span>上传</span>
+        </button>
+        <button class="mobile-nav-btn" id="navShare" onclick="switchMobileTab('share')">
+            <span class="icon">🔗</span>
+            <span>分享</span>
+        </button>
+    </div>
+
+    <div class="modal" id="shareModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>分享文件</h2>
+                <button class="modal-close" onclick="closeShareModal()">×</button>
+            </div>
+            <div style="padding: 12px; background: #f5f5f5; border-radius: 8px; margin-bottom: 16px; font-size: 13px;" id="shareFileName"></div>
+            <label style="font-size: 11px; color: #999;">分享链接</label>
+            <input type="text" id="shareLinkInput" readonly />
+            <button class="btn" onclick="copyShareLink()" style="width: 100%; margin-top: 12px;">复制链接</button>
+            <div class="qr-code">
+                <div id="qrCodeContainer"></div>
+                <p style="font-size: 11px; color: #999; margin-top: 8px;">扫描二维码下载文件</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="selectShareModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>选择要分享的文件或文件夹</h2>
+                <button class="modal-close" onclick="closeSelectShareModal()">×</button>
+            </div>
+            <div id="shareList" style="max-height: 400px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <div class="preview-modal" id="previewModal" onclick="closePreview()">
+        <button class="preview-close" onclick="closePreview()">×</button>
+        <div class="preview-loading" id="previewLoading">加载中...</div>
+        <img id="previewImage" src="" alt="预览" style="display: none;" />
+    </div>
+
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" id="contextRename" onclick="handleContextAction('rename')">
+            <span class="icon">✏️</span>
+            <span>重命名</span>
+        </div>
+        <div class="context-menu-item" id="contextDownload" onclick="handleContextAction('download')">
+            <span class="icon">⬇️</span>
+            <span>下载</span>
+        </div>
+        <div class="context-menu-item" id="contextMove" onclick="handleContextAction('move')">
+            <span class="icon">📁</span>
+            <span>移动到</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" id="contextDelete" onclick="handleContextAction('delete')">
+            <span class="icon">🗑️</span>
+            <span>删除</span>
+        </div>
+        <div class="context-menu-item" id="contextShare" onclick="handleContextAction('share')">
+            <span class="icon">🔗</span>
+            <span>分享</span>
+        </div>
+    </div>
+
+    <div class="modal" id="moveModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>移动到文件夹</h2>
+                <button class="modal-close" onclick="closeMoveModal()">×</button>
+            </div>
+            <div style="max-height: 300px; overflow-y: auto;">
+                <div class="context-menu-item" onclick="moveToRoot()">
+                    <span class="icon">📁</span>
+                    <span>根目录</span>
+                </div>
+                <div id="moveFolderList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
